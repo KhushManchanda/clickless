@@ -1,0 +1,71 @@
+# ------------------------------
+# ENV / SECRETS
+# ------------------------------
+.env
+*.env
+!env.example
+
+# ------------------------------
+# PYTHON
+# ------------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+*.db
+*.sqlite3
+
+# Virtual environments
+venv/
+env/
+.env/
+.venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ------------------------------
+# BUILD ARTIFACTS
+# ------------------------------
+dist/
+build/
+*.egg-info/
+
+# ------------------------------
+# STREAMLIT / CACHE
+# ------------------------------
+.streamlit/
+cache/
+.st-cache/
+
+# ------------------------------
+# VSCode / PyCharm
+# ------------------------------
+.vscode/
+.idea/
+
+# ------------------------------
+# OPERATING SYSTEM CLUTTER
+# ------------------------------
+.DS_Store
+Thumbs.db
+
+# ------------------------------
+# DATA DIRECTORIES
+# KEEP ONLY: data/headphones_aggregated_index.jsonl
+# IGNORE ALL RAW DATA (25–30 GB)
+# ------------------------------
+data/*
+!data/headphones_aggregated_index.jsonl
+
+# But still ignore any temp files
+*.jsonl.tmp
+*.jsonl.part
+*.tmp
+
+# ------------------------------
+# LOGS
+# ------------------------------
+*.log
+logs/

@@ -1,0 +1,55 @@
+import json
+import random
+
+PRODUCTS_PATH = "data/headphones_products_index.jsonl"
+REVIEWS_PATH = "data/headphones_reviews_index.jsonl"
+
+def load_some_products(n=5):
+    products = []
+    with open(PRODUCTS_PATH, "r", encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            products.append(json.loads(line))
+    print(f"Total headphone products in index: {len(products)}")
+    return random.sample(products, min(n, len(products)))
+
+def load_reviews_for_asins(target_asins, max_reviews_per_asin=3):
+    target_asins = set(target_asins)
+    reviews_by_asin = {a: [] for a in target_asins}
+
+    with open(REVIEWS_PATH, "r", encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            parent = r.get("parent_asin")
+            if parent in reviews_by_asin:
+                if len(reviews_by_asin[parent]) < max_reviews_per_asin:
+                    reviews_by_asin[parent].append(r)
+                # stop early if we filled all
+                if all(len(v) >= max_reviews_per_asin for v in reviews_by_asin.values()):
+                    break
+    return reviews_by_asin
+
+def main():
+    sample_products = load_some_products(n=5)
+    asins = [p["metadata"]["asin"] for p in sample_products]
+    reviews = load_reviews_for_asins(asins, max_reviews_per_asin=3)
+
+    for p in sample_products:
+        asin = p["metadata"]["asin"]
+        print("\n" + "=" * 80)
+        print("ASIN:   ", asin)
+        print("TITLE:  ", p["title"])
+        print("PRICE:  ", p["metadata"].get("price"))
+        print("RATING: ", p["metadata"].get("average_rating"), " (", p["metadata"].get("rating_number"), "reviews in meta )")
+        print("CATEGORIES:", p["metadata"].get("categories"))
+        print("\nSample reviews:")
+        for r in reviews.get(asin, []):
+            print("-" * 40)
+            print("  Rating:", r.get("rating"), "| Title:", r.get("title"))
+            print("  Text:", (r.get("text") or "")[:400].replace("\n", " "))
+
+if __name__ == "__main__":
+    main()
