@@ -14,7 +14,10 @@ SRC_DIR = os.path.join(PROJECT_ROOT, "src")
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
-from buying_guide.app.session import run_agentic_session  # noqa: E402
+from buying_guide.app.session import (  # noqa: E402
+    run_agentic_session,
+    continue_agentic_session,
+)
 
 
 st.set_page_config(page_title="Headphone Buying Guide", page_icon="🎧")
@@ -30,17 +33,20 @@ if not os.getenv("OPENAI_API_KEY"):
 # ---------- SESSION STATE SETUP ----------
 
 if "messages" not in st.session_state:
-    # Chat history for UI and planner context
+    # Chat history for UI and planner/explainer context
     st.session_state["messages"] = [
         {
             "role": "assistant",
-            "content": "Hi! Tell me what kind of headphones you're looking for "
-                       "(budget, use-case like gym/commute/audiophile, etc.).",
+            "content": (
+                "Hi! Tell me what kind of headphones you're looking for "
+                "(budget, use-case like gym/commute/audiophile, etc.)."
+            ),
         }
     ]
 
 if "last_result" not in st.session_state:
-    st.session_state["last_result"] = None  # store last agentic result (plan + products + answer)
+    # Stores the last agentic result (plan + products + explainer_products + answer)
+    st.session_state["last_result"] = None
 
 
 # ---------- HELPERS FOR UI RENDERING ----------
@@ -55,9 +61,12 @@ def render_product_cards(products):
         st.info("No products to display.")
         return
 
-    st.subheader("Recommended Products")
+    st.subheader("Recommendations")
 
     for p in products:
+        asin = p.get("asin")
+        amazon_url = f"https://www.amazon.com/dp/{asin}" if asin else None
+
         with st.container():
             cols = st.columns([1, 3])
 
@@ -71,6 +80,7 @@ def render_product_cards(products):
             # Textual info
             with cols[1]:
                 st.markdown(f"**{p['title']}**")
+
                 price = p.get("price")
                 if price is not None:
                     st.markdown(f"**Price:** ${price:.2f}")
@@ -89,43 +99,13 @@ def render_product_cards(products):
                         f"({p.get('review_count', 0)} reviews)"
                     )
 
-                st.markdown(
-                    f"**Score:** {p.get('score', 0):.3f} "
-                    f"(base: {p.get('base_score', 0):.3f}, "
-                    f"aspects: {p.get('aspect_score', 0):.3f})"
-                )
-                st.markdown(f"**ASIN:** `{p.get('asin')}`")
+                # ASIN as a clickable Amazon link
+                if asin and amazon_url:
+                    st.markdown(f"**ASIN:** [{asin}]({amazon_url})")
+                elif asin:
+                    st.markdown(f"**ASIN:** `{asin}`")
 
             st.markdown("---")
-
-
-def render_comparison_table(products):
-    """
-    Render a side-by-side comparison table for the current recommendations.
-    """
-    if not products:
-        return
-
-    import pandas as pd
-
-    rows = []
-    for p in products:
-        rows.append(
-            {
-                "Title": p["title"],
-                "Price ($)": p["price"],
-                "Avg Rating": p["avg_rating"],
-                "Reviews": p["review_count"],
-                "Score": p["score"],
-                "Base Score": p["base_score"],
-                "Aspect Score": p["aspect_score"],
-                "ASIN": p["asin"],
-            }
-        )
-
-    df = pd.DataFrame(rows)
-    st.subheader("Side-by-Side Comparison")
-    st.dataframe(df, width="stretch")
 
 
 # ---------- RENDER CHAT HISTORY ----------
@@ -144,19 +124,29 @@ if user_input:
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    # Build chat history for planner (excluding the latest user message)
-    history_for_planner = st.session_state["messages"][:-1]
+    # Build chat history for planner/explainer (excluding the latest user message)
+    history_for_llm = st.session_state["messages"][:-1]
 
-    # Agentic turn
+    # Decide whether this is the first turn (new search)
+    # or a follow-up (explanations / reviews / scoring).
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            result = run_agentic_session(
-                user_input,
-                top_k=5,
-                chat_history=history_for_planner,
-            )
+            if st.session_state["last_result"] is None:
+                # First turn → full agentic pipeline (plan + retrieve + explain)
+                result = run_agentic_session(
+                    user_input,
+                    top_k=5,
+                    chat_history=history_for_llm,
+                )
+            else:
+                # Follow-up turn → reuse existing plan/products, only re-explain.
+                result = continue_agentic_session(
+                    user_input,
+                    last_result=st.session_state["last_result"],
+                    chat_history=history_for_llm,
+                )
 
-        # Save last result for further UI (cards + comparison)
+        # Save last result for further turns
         st.session_state["last_result"] = result
 
         answer = result["answer"]
@@ -164,14 +154,10 @@ if user_input:
 
         products = result.get("products") or []
 
-        # Render product cards with thumbnails
+        # Render product cards with thumbnails + Amazon links
         render_product_cards(products)
 
-        # Comparison table inside an expander
-        with st.expander("Compare these options side by side"):
-            render_comparison_table(products)
-
-    # Persist assistant answer as a chat message
+    # Persist assistant answer as a chat message (text only – UI cards are extra)
     st.session_state["messages"].append({"role": "assistant", "content": answer})
 
 

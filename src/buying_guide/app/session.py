@@ -18,7 +18,6 @@ def _extract_image_url(rp: RankedProduct) -> Optional[str]:
     the original metadata:
       images: [{ "hi_res": ..., "large": ..., "thumb": ... }, ...]
     """
-    # Extra fields preserved from original metadata
     extra = rp.metadata.extra or {}
 
     images = extra.get("images") or extra.get("Images") or []
@@ -35,17 +34,44 @@ def _extract_image_url(rp: RankedProduct) -> Optional[str]:
     return None
 
 
+def _build_simple_products(ranked: List[RankedProduct]) -> List[Dict[str, Any]]:
+    """
+    Build the compact product representation used by the explainer.
+
+    NOTE: This is *not* the full metadata; only the fields the explainer needs.
+    """
+    simple_products: List[Dict[str, Any]] = []
+    for p in ranked:
+        m = p.metadata
+        simple_products.append(
+            {
+                "asin": m.asin,
+                "title": p.title,
+                "price": m.price,
+                "avg_rating": m.avg_rating_from_reviews or m.meta_average_rating,
+                "review_count": m.review_count,
+                "sample_pros": (m.sample_pros or [])[:3],
+                "sample_cons": (m.sample_cons or [])[:3],
+                "score": p.score,
+            }
+        )
+    return simple_products
+
+
 def run_agentic_session(
     user_query: str,
     top_k: int = 5,
     chat_history: Optional[List[Dict[str, str]]] = None,
 ) -> Dict[str, Any]:
     """
-    Orchestrate a full agentic cycle:
+    Orchestrate a full agentic cycle for an *initial* recommendation query:
 
     - Planner LLM → BuyingGuidePlan (using optional chat_history for refinements)
     - Retriever → top_k RankedProduct
     - Explainer LLM → answer text
+
+    This function *also* returns a compact product list for the explainer so
+    that follow-up questions can reuse the same products without re-ranking.
     """
     # Plan
     plan: BuyingGuidePlan = plan_from_query(user_query, chat_history=chat_history)
@@ -56,25 +82,35 @@ def run_agentic_session(
         plan, top_k=top_k, products=products
     )
 
-    # Explain
-    answer: str = explain_recommendations(user_query, plan, ranked)
+    # Compact list for explainer (pros/cons, score, etc.)
+    explainer_products: List[Dict[str, Any]] = _build_simple_products(ranked)
 
-    # Shape a lightweight product list for UI / API
-    product_payload = []
-    for p in ranked:
+    # Natural-language answer
+    answer: str = explain_recommendations(
+        user_query,
+        plan,
+        explainer_products,
+        chat_history=chat_history,
+    )
+
+    # Shape a lightweight product list for UI / API cards
+    product_payload: List[Dict[str, Any]] = []
+    for p, sp in zip(ranked, explainer_products):
         image_url = _extract_image_url(p)
         product_payload.append(
             {
                 "title": p.title,
-                "price": p.metadata.price,
-                "avg_rating": p.metadata.avg_rating_from_reviews
-                or p.metadata.meta_average_rating,
-                "review_count": p.metadata.review_count,
-                "asin": p.metadata.asin,
-                "score": p.score,
+                "price": sp["price"],
+                "avg_rating": sp["avg_rating"],
+                "review_count": sp["review_count"],
+                "asin": sp["asin"],
+                "score": sp["score"],
                 "base_score": p.base_score,
                 "aspect_score": p.aspect_score,
                 "image_url": image_url,
+                # keep pros/cons around for follow-ups, even if UI doesn't show them
+                "sample_pros": sp.get("sample_pros") or [],
+                "sample_cons": sp.get("sample_cons") or [],
             }
         )
 
@@ -82,4 +118,48 @@ def run_agentic_session(
         "plan": plan.to_dict(),
         "products": product_payload,
         "answer": answer,
+        # extra field used for follow-up turns (no new retrieval)
+        "explainer_products": explainer_products,
+    }
+
+
+def continue_agentic_session(
+    user_query: str,
+    last_result: Dict[str, Any],
+    chat_history: Optional[List[Dict[str, str]]] = None,
+) -> Dict[str, Any]:
+    """
+    Handle a *follow-up* user message without changing the underlying
+    recommendations.
+
+    We:
+    - Rebuild a BuyingGuidePlan object from last_result["plan"]
+    - Reuse last_result["explainer_products"] (same products / scores)
+    - Call the explainer again with updated chat_history
+
+    Returned structure mirrors run_agentic_session so the UI code can treat
+    both paths uniformly.
+    """
+    plan_dict = last_result.get("plan") or {}
+    explainer_products = last_result.get("explainer_products") or []
+
+    # Reconstruct a BuyingGuidePlan from the stored dict
+    plan = BuyingGuidePlan.from_llm_dict(
+        raw_query=plan_dict.get("raw_query", user_query),
+        d=plan_dict,
+    )
+
+    answer: str = explain_recommendations(
+        user_query,
+        plan,
+        explainer_products,
+        chat_history=chat_history,
+    )
+
+    # Do *not* change products or plan – keep them stable for the conversation
+    return {
+        "plan": plan_dict,
+        "products": last_result.get("products") or [],
+        "answer": answer,
+        "explainer_products": explainer_products,
     }
