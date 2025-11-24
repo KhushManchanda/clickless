@@ -10,6 +10,63 @@ from ..index import load_index
 from ..index.retriever import retrieve_ranked_products
 
 
+def detect_intent(user_query: str) -> str:
+    """
+    Detect whether the user is asking for NEW recommendations or following up
+    on EXISTING products.
+    
+    Returns:
+        "new_search" - user wants new/different recommendations
+        "follow_up" - user is asking about existing products (reviews, details, etc.)
+    """
+    query_lower = user_query.lower()
+    
+    # Keywords that indicate BUDGET CHANGES (should trigger new search)
+    budget_change_keywords = [
+        "increase budget", "raise budget", "lower budget", "reduce budget",
+        "budget to", "spend up to", "max budget", "change budget"
+    ]
+    
+    # Check for budget changes first - these should trigger new search
+    for keyword in budget_change_keywords:
+        if keyword in query_lower:
+            return "new_search"
+    
+    # Keywords that indicate a NEW search
+    new_search_keywords = [
+        "different", "other options", "more headphones", "show me",
+        "recommend", "find me", "looking for", "need", "want",
+        "instead", "change", "switch to", "rather", "prefer",
+        "what about", "how about", "any", "suggestions",
+        "cheaper alternatives", "better options", "higher quality"
+    ]
+    
+    # Keywords that indicate a FOLLOW-UP on existing results
+    follow_up_keywords = [
+        "review", "tell me more", "about #", "about the",
+        "why", "how did", "pros", "cons", "first product",
+        "second one", "explain", "decision", "choose",
+        "1st", "2nd", "3rd", "4th", "5th",
+        "#1", "#2", "#3", "#4", "#5",
+        "this one", "that one", "these", "scoring",
+        "ranking", "rated", "picked", "selected",
+        "compare", "comparison", "difference between", "vs"
+    ]
+    
+    # Check for follow-up keywords first (more specific)
+    for keyword in follow_up_keywords:
+        if keyword in query_lower:
+            return "follow_up"
+    
+    # Check for new search keywords
+    for keyword in new_search_keywords:
+        if keyword in query_lower:
+            return "new_search"
+    
+    # Default: if uncertain, treat as follow-up to avoid redundant cards
+    return "follow_up"
+
+
 def _extract_image_url(rp: RankedProduct) -> Optional[str]:
     """
     Try to extract a representative image URL from metadata, if available.
@@ -120,6 +177,8 @@ def run_agentic_session(
         "answer": answer,
         # extra field used for follow-up turns (no new retrieval)
         "explainer_products": explainer_products,
+        # Show product cards on initial search
+        "show_products": True,
     }
 
 
@@ -136,6 +195,7 @@ def continue_agentic_session(
     - Rebuild a BuyingGuidePlan object from last_result["plan"]
     - Reuse last_result["explainer_products"] (same products / scores)
     - Call the explainer again with updated chat_history
+    - Detect user intent to determine if we should show product cards again
 
     Returned structure mirrors run_agentic_session so the UI code can treat
     both paths uniformly.
@@ -156,10 +216,17 @@ def continue_agentic_session(
         chat_history=chat_history,
     )
 
+    # Detect if user wants to see product cards again
+    # (e.g., "show me different options" vs "tell me about #1")
+    intent = detect_intent(user_query)
+    show_products = (intent == "new_search")
+
     # Do *not* change products or plan – keep them stable for the conversation
     return {
         "plan": plan_dict,
         "products": last_result.get("products") or [],
         "answer": answer,
         "explainer_products": explainer_products,
+        "show_products": show_products,
     }
+
