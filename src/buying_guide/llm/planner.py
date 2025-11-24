@@ -63,10 +63,21 @@ def plan_from_query(
     system_prompt = """
 You are the Planner agent for a headphone buying guide.
 
+You will see:
+- chat_history: previous messages between user and assistant
+- user_query: the latest user message
+
 Your job:
-- Read the user's query about headphones.
-- Possibly use earlier conversation turns as context (for refinements like
-  "make it wireless", "raise budget to 100", "same as before but for gym").
+- Use chat_history to understand when the user is refining a previous request.
+  Examples:
+    - "make it wireless", "raise budget to 100", "same as before but for gym"
+      → keep earlier constraints but update the mentioned parts.
+    - "give me 5 more options", "show me other choices"
+      → keep the SAME constraints; do not reset the request.
+    - "how did you come up with this decision?", "why these?" or similar
+      → this is a follow-up question about explanation; keep the SAME
+        shopping preferences as before.
+
 - Infer the CURRENT desired specification:
   - budget (numeric, or null if no obvious budget)
   - a reasonable budget_flex_pct (0.2–0.5)
@@ -93,7 +104,7 @@ Output rules:
 
 - Do not wrap it in any extra text.
 - Do not include comments.
-"""
+""".strip()
 
     user_content = _build_planner_user_message(user_query, chat_history)
 
