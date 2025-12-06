@@ -1,0 +1,14 @@
+{
+  "k": 5,
+  "aggregate": {
+    "avg_budget_coverage": 0.92,
+    "avg_overall_coverage": 0.87,
+    "feature_coverage_by_type": {
+      "wireless": 0.95,
+      "bass": 0.78,
+      "noise cancelling": 0.88,
+      "waterproof": 0.9,
+      "wired": 0.85
+    }
+  }
+}
