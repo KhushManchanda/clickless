@@ -3,7 +3,7 @@
 
 Clickless is an **agentic AI system** that transforms headphone shopping into a simple conversation. Instead of clicking through hundreds of products and reading thousands of reviews, just tell Clickless what you're looking for and get personalized recommendations backed by actual user reviews.
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit)](https://khushmanchanda-clickless-uistreamlit-app-escdit.streamlit.app)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit)](https://khushmanchanda-clickless-uistreamlit-app-esdcit.streamlit.app/)
 
 ---
 
