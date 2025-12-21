@@ -266,11 +266,6 @@ This project uses the UCSD Amazon Product Dataset under its respective license t
 
 ---
 
-## 👤 Author
-
-**Khush Manchanda**  
-GitHub: [@KhushManchanda](https://github.com/KhushManchanda)
-
 ---
 
 **Built to make online shopping less painful, one conversation at a time.** 💬🎧
