@@ -69,3 +69,31 @@ data/*
 # ------------------------------
 *.log
 logs/
+
+# ------------------------------
+# CLASS PROJECT FILES
+# (Keep locally, don't push to GitHub)
+# ------------------------------
+PORTFOLIO.md
+eval_results/
+
+# ------------------------------
+# INTERMEDIATE DATA FILES
+# (Large files used during preprocessing)
+# ------------------------------
+headphones_products_index.jsonl
+headphones_reviews_index.jsonl
+
+# ------------------------------
+# TEMPORARY / EVALUATION SCRIPTS
+# (Keep locally for development)
+# ------------------------------
+scaffold.py
+scripts/py
+scripts/script.py
+scripts/script2.py
+scripts/compare_baselines.py
+scripts/evaluate_constraint_coverage.py
+scripts/evaluate_precision_recall.py
+scripts/generate_sample_results.py
+scripts/generate_visualizations.py
