@@ -21,10 +21,10 @@ AGGREGATED_INDEX_PATH = DATA_DIR / "headphones_aggregated_index.jsonl"
 # ---------- OpenAI models ----------
 
 # LLM used for planning (intent → JSON plan)
-PLANNER_MODEL = "gpt-4.1-mini"
+PLANNER_MODEL = "llama3"
 
 # LLM used for explanation (pros/cons, reasoning text)
-EXPLAINER_MODEL = "gpt-4.1-mini"
+EXPLAINER_MODEL = "llama3"
 
 # ---------- Retrieval defaults ----------
 
